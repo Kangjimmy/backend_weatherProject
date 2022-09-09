@@ -22,12 +22,15 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class DiaryService {
 
     private final DiaryRepository diaryRepository;
 
     @Value("${openweathermap.key}")
     private String apiKey;
+
+    @Transactional
     public void createDiary(LocalDate date, String text) {
 
         Map<String, Object> jsonMap = parseWeather(getWeatherString());
@@ -106,6 +109,7 @@ public class DiaryService {
         return diaryRepository.findAllByDateBetween(startDate, endDate);
     }
 
+    @Transactional
     public void updateDiary(LocalDate date, String text) {
         Diary nowDiary = diaryRepository.findFirstByDate(date);
 
