@@ -1,27 +1,29 @@
 package zerobase.weather;
 
+import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+import zerobase.weather.service.DiaryService;
+
+import java.time.LocalDate;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.anything;
-import static org.hamcrest.Matchers.equalTo;
 
 @SpringBootTest
+@Transactional
 class WeatherApplicationTests {
 
-    @Test
-    void sampleTest() {
-        assertThat(1, anything());
+    private final DiaryService diaryService;
+
+    WeatherApplicationTests(DiaryService diaryService) {
+        this.diaryService = diaryService;
     }
 
     @Test
-    void equalTest() {
-        assertThat(1, equalTo(1));
+    void readDiaryTest() {
+        assertThat(diaryService.readDiary(LocalDate.of(2022,9,7)).size(), CoreMatchers.is(2));
     }
 
-    @Test
-    void failTest() {
-        assertThat(1, equalTo(2));
-    }
 }
