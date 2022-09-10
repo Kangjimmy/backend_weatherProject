@@ -1,14 +1,19 @@
 package zerobase.weather.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import zerobase.weather.domain.DateWeather;
 import zerobase.weather.domain.Diary;
+import zerobase.weather.error.InvalidDateException;
+import zerobase.weather.repository.DateWeatherRepository;
 import zerobase.weather.repository.DiaryRepository;
 
 import java.io.BufferedReader;
@@ -23,24 +28,33 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class DiaryService {
 
     private final DiaryRepository diaryRepository;
+    private final DateWeatherRepository dateWeatherRepository;
 
     @Value("${openweathermap.key}")
     private String apiKey;
 
+    @Scheduled(cron = "0 0 1 * * *")
+    @Transactional
+    public void saveWeatherDate() {
+        dateWeatherRepository.save(getWeatherDataFromApi());
+        log.info("getWeatherDataFromApi SUCCESS");
+    }
+
     @Transactional
     public void createDiary(LocalDate date, String text) {
 
-        Map<String, Object> jsonMap = parseWeather(getWeatherString());
+        DateWeather dateWeather = getDateWeather(date);
 
         Diary diary = Diary.builder()
                 .date(date)
                 .text(text)
-                .icon((String) jsonMap.get("icon"))
-                .temperature((Double) jsonMap.get("temp"))
-                .weather((String) jsonMap.get("main"))
+                .icon(dateWeather.getIcon())
+                .temperature(dateWeather.getTemperature())
+                .weather(dateWeather.getWeather())
                 .build();
 
         diaryRepository.save(diary);
@@ -102,6 +116,9 @@ public class DiaryService {
     }
 
     public List<Diary> readDiary(LocalDate date) {
+//        if (date.isAfter(LocalDate.ofYearDay(3050, 1))) {
+//            throw new InvalidDateException();
+//        }
         return diaryRepository.findAllByDate(date);
     }
 
@@ -120,5 +137,33 @@ public class DiaryService {
     @Transactional
     public void deleteDiary(LocalDate date) {
         diaryRepository.deleteAllByDate(date);
+    }
+
+    private DateWeather getWeatherDataFromApi() {
+        String jsonString = getWeatherString();
+        Map<String, Object> parsedWeather = parseWeather(jsonString);
+
+        DateWeather dateWeather = DateWeather.builder()
+                .date(LocalDate.now())
+                .weather((String) parsedWeather.get("main"))
+                .icon((String) parsedWeather.get("icon"))
+                .temperature((Double) parsedWeather.get("temp"))
+                .build();
+
+        return dateWeather;
+    }
+
+    private DateWeather getDateWeather(LocalDate date) {
+
+        List<DateWeather> dateWeatherList = dateWeatherRepository.findAllByDate(date);
+
+        if (dateWeatherList.size() == 0) {
+            //과거 날짜의 날씨를 가져올 수 없기 때문에
+            //없을 경우에는 오늘 날씨를 가져와야 한다.
+            return getWeatherDataFromApi();
+        } else {
+            return dateWeatherList.get(0);
+        }
+
     }
 }
